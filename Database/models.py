@@ -81,22 +81,3 @@ class Feeling(Base):
     feeling = Column(String)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
-class Discussion(Base):
-    __tablename__ = "discussions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), ForeignKey("users.uid"))
-    title = Column(String(100), nullable=False)
-    content = Column(String, nullable=False)
-
-    comments = relationship("Comment", back_populates="discussion")
-
-class Comment(Base):
-    __tablename__ = "comments"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), ForeignKey("users.uid"))
-    discussion_id = Column(Integer, ForeignKey("discussions.id"))
-    content = Column(String, nullable=False)
-
-    discussion = relationship("Discussion", back_populates="comments")
