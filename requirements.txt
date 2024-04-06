@@ -20,4 +20,4 @@ python-dotenv==1.0.1
 pandas 
 numpy 
 yfinance 
-sklearn
+scikit-learn
