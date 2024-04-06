@@ -425,36 +425,5 @@ def submit_feeling(uid: str, feeling: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to submit feeling: " + str(e))
     
-@app.get("/discussions", tags=["Discussion"])
-def get_discussions(db: Session = Depends(get_db)):
-    discussions = db.query(models.Discussion).all()
-    return discussions
 
-# Get a specific discussion
-@app.get("/discussions/{discussion_id}", tags=["Discussion"])
-def get_discussion(discussion_id: int, db: Session = Depends(get_db)):
-    discussion = db.query(models.Discussion).filter(models.Discussion.id == discussion_id).first()
-    if not discussion:
-        raise HTTPException(status_code=404, detail="Discussion not found")
-    return discussion
 
-# Create a new discussion
-@app.post("/discussions", tags=["Discussion"])
-def create_discussion(discussion: models.Discussion, db: Session = Depends(get_db)):
-    db_discussion = models.Discussion(**discussion.dict())
-    db.add(db_discussion)
-    db.commit()
-    db.refresh(db_discussion)
-    return db_discussion
-
-# Create a new comment
-@app.post("/discussions/{discussion_id}/comments", tags=["Comment"])
-def create_comment(discussion_id: int, comment: models.Comment, db: Session = Depends(get_db)):
-    discussion = db.query(models.Discussion).filter(models.Discussion.id == discussion_id).first()
-    if not discussion:
-        raise HTTPException(status_code=404, detail="Discussion not found")
-    db_comment = models.Comment(**comment.dict(), discussion_id=discussion_id)
-    db.add(db_comment)
-    db.commit()
-    db.refresh(db_comment)
-    return db_comment
