@@ -100,4 +100,3 @@ class Comment(Base):
     content = Column(String, nullable=False)
 
     discussion = relationship("Discussion", back_populates="comments")
-

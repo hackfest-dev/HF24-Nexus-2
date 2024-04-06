@@ -425,36 +425,37 @@ def submit_feeling(uid: str, feeling: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to submit feeling: " + str(e))
     
+@app.post("/discussions/", response_model=models.Discussion)
+def create_discussion(discussion: models.DiscussionCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_discussion = models.Discussion(title=discussion.title, content=discussion.content, user_id=current_user.uid)
+    db.add(db_discussion)
+    db.commit()
+    db.refresh(db_discussion)
+    return db_discussion
 
-@app.post("/discussions", tags=["Discussion"])
-def create_discussion(uid: str, title: str, content: str, db: Session = Depends(get_db)):
-    try:
-        discussion = models.Discussion(user_id=uid, title=title, content=content)
-        db.add(discussion)
-        db.commit()
-        return {"status": "Success", "discussion_id": discussion.id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to create discussion: " + str(e))
+# Get all discussions
+@app.get("/discussions/", response_model=list[models.Discussion])
+def get_discussions(db: Session = Depends(get_db)):
+    discussions = db.query(models.Discussion).all()
+    return discussions
 
-@app.post("/discussions/{discussion_id}/comments", tags=["Discussion"])
-def create_comment(uid: str, discussion_id: int, content: str, db: Session = Depends(get_db)):
-    try:
-        comment = models.Comment(user_id=uid, discussion_id=discussion_id, content=content)
-        db.add(comment)
-        db.commit()
-        return {"status": "Success", "comment_id": comment.id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to create comment: " + str(e))
-
-@app.get("/discussions/{discussion_id}", tags=["Discussion"])
+# Get a specific discussion
+@app.get("/discussions/{discussion_id}", response_model=models.Discussion)
 def get_discussion(discussion_id: int, db: Session = Depends(get_db)):
     discussion = db.query(models.Discussion).filter(models.Discussion.id == discussion_id).first()
     if not discussion:
         raise HTTPException(status_code=404, detail="Discussion not found")
     return discussion
 
-@app.get("/discussions/{discussion_id}/comments", tags=["Discussion"])
-def get_comments(discussion_id: int, db: Session = Depends(get_db)):
-    comments = db.query(models.Comment).filter(models.Comment.discussion_id == discussion_id).all()
-    return comments
+# Add a comment to a discussion
+@app.post("/discussions/{discussion_id}/comments/", response_model=models.Comment)
+def create_comment(discussion_id: int, comment: models.CommentCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_discussion = db.query(models.Discussion).filter(models.Discussion.id == discussion_id).first()
+    if not db_discussion:
+        raise HTTPException(status_code=404, detail="Discussion not found")
+    db_comment = models.Comment(content=comment.content, user_id=current_user.uid, discussion_id=discussion_id)
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    return db_comment
 
