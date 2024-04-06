@@ -1,5 +1,5 @@
 from .sql import Base
-from sqlalchemy import DATE, TIMESTAMP, Column, Integer, String, ForeignKey, Float, UniqueConstraint
+from sqlalchemy import DATE, TIMESTAMP, Column, Integer, String, ForeignKey, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -22,19 +22,6 @@ class User(Base):
     transactions_account = relationship('AccountTransactions', backref='user')
     transactions_crypto = relationship('CryptoTransactions', backref='user')
     crypto_holdings = relationship("CryptoHoldings", backref="user")
-
-class Crypto_Prices(Base):
-    __tablename__ = "crypto_prices"
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    token_id = Column(String(50), nullable=False)
-    token_name = Column(String(50), nullable=False)
-    token_symbol = Column(String(50), nullable=False)
-    token_price = Column(Float, nullable=False)
-    price_time = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint('token_id', 'price_time', name='uq_token_id_price_time'),
-    )
 
 class AccountTransactions(Base):
 
@@ -77,4 +64,5 @@ class CryptoHoldings(Base):
     token_symbol = Column(String(50), nullable=False)
 
     quantity = Column(Float)
+
     bought_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
