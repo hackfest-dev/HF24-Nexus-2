@@ -261,6 +261,35 @@ async def sell_crypto(uid : str, token_id : str, quantity : float,  db: Session 
         return {"status" : "Success"}
     else:
         return {"status": "Failed", "Reason" : "Not enough holdings"}
+    
+@app.get("/fetch_coin_data")
+async def fetch_coin_data(db: Session = Depends(get_db)):
+    fetch_coin_data = "https://coinranking1.p.rapidapi.com/coins"
+
+    headers = {
+        "X-RapidAPI-Key": "6c15ef80a9msh0fab964ed355602p120ff5jsn278d01eb24fb",
+        "X-RapidAPI-Host": "coinranking1.p.rapidapi.com", 
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(fetch_coin_data, headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        coins = data["data"]["coins"]
+
+        for coin in coins:
+            coin_data = models.Crypto_Prices(
+                token_id=coin["uuid"],
+                token_name=coin["name"],
+                token_symbol=coin["symbol"],
+                token_price=float(coin["price"]),
+            )
+
+            db.add(coin_data)
+        db.commit()
+
+    return {"status": "Success"}
 
 @app.get("/users/{uid}/crypto_holdings", tags=["Crypto"])
 def get_crypto_holdings(uid:str,  db: Session = Depends(get_db)):
