@@ -66,3 +66,11 @@ class CryptoHoldings(Base):
     quantity = Column(Float)
 
     bought_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
+
+class VolatilityIndex(Base):
+    __tablename__ = 'volatilityindex'
+
+    normalized_volatility_index = Column(Float, nullable=False)
+    date = Column(TIMESTAMP, nullable=False, primary_key=True , server_default=func.now())
+
+

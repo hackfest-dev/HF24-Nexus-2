@@ -8,6 +8,11 @@ from sqlalchemy import func, update
 from Database import models
 from Database.sql import engine, SessionLocal
 
+import yfinance as yf
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+
 import httpx
 # from Database.schema import CabBase, CabsResponse, DriversResponse, DriverBase, DeleteResponse, SearchRequest
 
@@ -332,3 +337,46 @@ def initial_portfolio_value(uid:str,  db: Session = Depends(get_db)):
             original_value += transaction.token_price * transaction.quantity
 
     return { "original_value" : original_value }
+
+@app.get('/get_volatility', tags=["Crypto"])
+def get_volatility(db: Session = Depends(get_db)):
+    # Get the top 10 cryptocurrencies from Yahoo Finance
+    tickers = ["BTC-USD", "ETH-USD", "USDT-USD", "BNB-USD", "XRP-USD", "ADA-USD", "DOGE-USD", "MATIC-USD", "DOT-USD", "LTC-USD"]
+    data = yf.download(tickers, period="90d", auto_adjust=True, threads=True)
+
+    # Create a DataFrame with the cryptocurrency data
+    df = pd.DataFrame()
+    for ticker in tickers:
+        df[ticker] = data['Close'][ticker]
+
+    # Calculate daily percentage changes
+    daily_changes = df.pct_change().dropna()
+
+    # Calculate average daily percentage change
+    avg_daily_pct_change = daily_changes.mean(axis=1)
+
+    # Calculate volatility index (standard deviation of daily returns)
+    volatility_index = daily_changes.std(axis=1)
+
+    # Normalize volatility index between 0 and 1
+    scaler = MinMaxScaler()
+    normalized_volatility_index = scaler.fit_transform(volatility_index.values.reshape(-1, 1))
+
+    # Resample to monthly frequency
+    monthly_data = pd.DataFrame({
+        'normalized_volatility_index': pd.Series(normalized_volatility_index.ravel(), index=avg_daily_pct_change.index).resample('D').mean()
+    })
+
+    # Store the monthly data in the VolatilityIndex table
+    for index, row in monthly_data.iterrows():
+        volatility_record = models.VolatilityIndex(
+            normalized_volatility_index=row['normalized_volatility_index'],
+            date=index
+        )
+        db.add(volatility_record)
+    db.commit()
+
+    return monthly_data
+
+
+
