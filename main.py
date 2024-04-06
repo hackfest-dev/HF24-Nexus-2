@@ -278,70 +278,76 @@ async def fetch_coin_data(db: Session = Depends(get_db)):
         db.commit()
 
     return {"status": "Success"}
-
 @app.post("/users/{uid}/sell_crypto", tags=["Crypto"])
 async def sell_crypto(uid: str, token_id: str, quantity: float, db: Session = Depends(get_db)):
+    # Retrieve user's crypto holding for the specified token
     user_holding = db.query(models.CryptoHoldings).filter(models.CryptoHoldings.user_id == uid).filter(models.CryptoHoldings.token_id == token_id).first()
-    holding_quantity = user_holding.quantity
 
-    if holding_quantity >= quantity:
-        user_holding.quantity -= quantity
+    if user_holding:
+        holding_quantity = user_holding.quantity
 
-        coin_data = db.query(models.Crypto_Prices).filter(models.Crypto_Prices.token_id == token_id).first()
+        if holding_quantity >= quantity:
+            # Reduce the quantity of the crypto holding
+            user_holding.quantity -= quantity
 
-        if coin_data:
+            # Retrieve or fetch coin data from the database or CoinRanking API
+            coin_data = db.query(models.Crypto_Prices).filter(models.Crypto_Prices.token_id == token_id).first()
+
+            if not coin_data:
+                # Fetch coin data from CoinRanking API
+                fetch_coin_data = f"https://coinranking1.p.rapidapi.com/coin/{token_id}"
+                headers = {
+                    "X-RapidAPI-Key": "6c15ef80a9msh0fab964ed355602p120ff5jsn278d01eb24fb",
+                    "X-RapidAPI-Host": "coinranking1.p.rapidapi.com",
+                }
+
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(fetch_coin_data, headers=headers)
+
+                if response.status_code == 200:
+                    data = response.json()["data"]["coin"]
+                    coin_data = models.Crypto_Prices(
+                        token_id=data["uuid"],
+                        token_name=data["name"],
+                        token_symbol=data["symbol"],
+                        token_price=float(data["price"]),
+                    )
+                    db.add(coin_data)
+                    db.commit()
+                else:
+                    raise HTTPException(status_code=500, detail="Failed to fetch cryptocurrency data from API")
+
+            # Calculate fiat cash from selling the crypto
             fiat_cash = float(coin_data.token_price) * quantity
-        else:
-            # Fetch coin data from CoinRanking API and store it in the table
-            fetch_coin_data = f"https://coinranking1.p.rapidapi.com/coin/{token_id}"
-            headers = {
-                "X-RapidAPI-Key": "6c15ef80a9msh0fab964ed355602p120ff5jsn278d01eb24fb",
-                "X-RapidAPI-Host": "coinranking1.p.rapidapi.com",
-            }
 
-            async with httpx.AsyncClient() as client:
-                response = await client.get(fetch_coin_data, headers=headers)
+            # Update user's balance with the fiat cash
+            user_obj = db.query(models.User).filter(models.User.uid == uid).first()
+            user_obj.Current_Balance += fiat_cash
 
-            if response.status_code == 200:
-                data = response.json()
-                data = data["data"]["coin"]
-                fiat_cash = float(data["price"]) * quantity
+            # Record the sell transaction
+            transaction = models.CryptoTransactions(
+                user_id=uid,
+                transaction_type="SELL",
+                token_id=token_id,
+                token_name=coin_data.token_name,
+                token_symbol=coin_data.token_symbol,
+                token_price=coin_data.token_price,
+                quantity=quantity,
+            )
 
-                coin_data = models.Crypto_Prices(
-                    token_id=data["uuid"],
-                    token_name=data["name"],
-                    token_symbol=data["symbol"],
-                    token_price=float(data["price"]),
-                )
-                db.add(coin_data)
+            try:
+                db.add(transaction)
                 db.commit()
-            else:
-                return {"status": "Failed"}
+            except SQLAlchemyError as e:
+                db.rollback()
+                raise HTTPException(status_code=500, detail="Error during selling transaction")
 
-        user_obj = db.query(models.User).filter(models.User.uid == uid).first()
-        user_obj.Current_Balance += fiat_cash
-
-        transaction = models.CryptoTransactions(
-            user_id=uid,
-            transaction_type="SELL",
-            token_id=token_id,
-            token_name=coin_data.token_name,
-            token_symbol=coin_data.token_symbol,
-            token_price=coin_data.token_price,
-            quantity=quantity,
-        )
-
-        try:
-            db.add(transaction)
-            db.commit()
-        except SQLAlchemyError as e:
-            print("Error during selling:", str(e))
-            raise HTTPException(status_code=404, detail="Error during selling")
-
-        return {"status": "Success"}
+            return {"status": "Success"}
+        else:
+            raise HTTPException(status_code=400, detail="Not enough holdings to sell")
     else:
-        return {"status": "Failed", "Reason": "Not enough holdings"}
-
+        raise HTTPException(status_code=404, detail="Crypto holding not found for the user")
+    
 @app.get("/users/{uid}/crypto_holdings", tags=["Crypto"])
 def get_crypto_holdings(uid:str,  db: Session = Depends(get_db)):
     holdings = db.query(models.CryptoHoldings).filter(models.CryptoHoldings.user_id == uid).filter(models.CryptoHoldings.quantity != 0).order_by(models.CryptoHoldings.bought_at.desc()).all()
