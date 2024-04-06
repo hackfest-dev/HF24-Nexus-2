@@ -370,13 +370,13 @@ def get_volatility(db: Session = Depends(get_db)):
     })
 
     # Store the monthly data in the VolatilityIndex table
-    for index, row in monthly_data.iterrows():
-        volatility_record = models.VolatilityIndex(
-            normalized_volatility_index=row['normalized_volatility_index'],
-            date=index
-        )
-        db.add(volatility_record)
-    db.commit()
+    # for index, row in monthly_data.iterrows():
+    #     volatility_record = models.VolatilityIndex(
+    #         normalized_volatility_index=row['normalized_volatility_index'],
+    #         date=index
+    #     )
+    #     db.add(volatility_record)
+    # db.commit()
 
     return monthly_data
 
