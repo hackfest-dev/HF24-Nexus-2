@@ -20,4 +20,5 @@ python-dotenv==1.0.1
 pandas 
 numpy 
 yfinance 
-scikit-learn
+scikit-learn==1.4.1.post1
+pickle

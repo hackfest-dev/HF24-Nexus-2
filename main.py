@@ -8,9 +8,11 @@ from sqlalchemy import func, update
 from Database import models
 from Database.sql import engine, SessionLocal
 
+from datetime import datetime, timedelta
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import pickle
 from sklearn.preprocessing import MinMaxScaler
 
 import httpx
@@ -103,7 +105,7 @@ def get_crypto_transactions_info(uid: str, db: Session = Depends(get_db)):
             "Cryptocurrency Name": transaction.token_name,
             "Transaction Type": transaction.transaction_type,
             "Average Buying Price": None,
-            "Date": transaction.transaction_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "Date": datetime.fromisoformat(transaction.transaction_time.isoformat()),
             "Quantity": transaction.quantity,
             "Price": transaction.token_price,
             "Amount": transaction.quantity * transaction.token_price,
@@ -378,5 +380,37 @@ def get_volatility(db: Session = Depends(get_db)):
 
     return monthly_data
 
+@app.get('/users/{uid}/calculate_stress_metric', tags=["Crypto"])
+def calculate_stress_metric(uid: str, db: Session = Depends(get_db)):
+    # Load the stress model
+    with open('stress_model.pkl', 'rb') as f:
+        clf2 = pickle.load(f)
 
+    # Get the latest normalized volatility index from the database
+    latest_volatility = db.query(models.VolatilityIndex).order_by(models.VolatilityIndex.date.desc()).first()
+    market_volatility = latest_volatility.normalized_volatility_index
+
+    # Get the crypto transactions info
+    transactions_info = get_crypto_transactions_info(uid, db)
+
+    # Group the transactions by day and count the number of trades per day
+    today = datetime.now().date()
+    num_trades_per_day = {}
+    for i in range(90):
+        day = today - timedelta(days=i)
+        transactions_on_day = [t for t in transactions_info if t['Date'].date() == day]
+        num_trades_per_day[day] = len(transactions_on_day)
+
+    # Calculate the required variables
+    realized_pl_ratios = [t['Realized P/L (%)'] for t in transactions_info if t['Realized P/L (%)'] is not None]
+    if realized_pl_ratios:
+        realized_pl_ratio = sum(realized_pl_ratios) / len(realized_pl_ratios)
+    else:
+        realized_pl_ratio = 0
+    num_trades = sum(num_trades_per_day.values())
+
+    # Use the model to calculate the stress metric
+    stress_metric = clf2.predict([[num_trades, market_volatility, realized_pl_ratio]])[0]
+
+    return {'stress_metric': stress_metric}
 
