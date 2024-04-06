@@ -424,4 +424,37 @@ def submit_feeling(uid: str, feeling: str, db: Session = Depends(get_db)):
         return {"status": "Success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to submit feeling: " + str(e))
+    
+
+@app.post("/discussions", tags=["Discussion"])
+def create_discussion(uid: str, title: str, content: str, db: Session = Depends(get_db)):
+    try:
+        discussion = models.Discussion(user_id=uid, title=title, content=content)
+        db.add(discussion)
+        db.commit()
+        return {"status": "Success", "discussion_id": discussion.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to create discussion: " + str(e))
+
+@app.post("/discussions/{discussion_id}/comments", tags=["Discussion"])
+def create_comment(uid: str, discussion_id: int, content: str, db: Session = Depends(get_db)):
+    try:
+        comment = models.Comment(user_id=uid, discussion_id=discussion_id, content=content)
+        db.add(comment)
+        db.commit()
+        return {"status": "Success", "comment_id": comment.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to create comment: " + str(e))
+
+@app.get("/discussions/{discussion_id}", tags=["Discussion"])
+def get_discussion(discussion_id: int, db: Session = Depends(get_db)):
+    discussion = db.query(models.Discussion).filter(models.Discussion.id == discussion_id).first()
+    if not discussion:
+        raise HTTPException(status_code=404, detail="Discussion not found")
+    return discussion
+
+@app.get("/discussions/{discussion_id}/comments", tags=["Discussion"])
+def get_comments(discussion_id: int, db: Session = Depends(get_db)):
+    comments = db.query(models.Comment).filter(models.Comment.discussion_id == discussion_id).all()
+    return comments
 
