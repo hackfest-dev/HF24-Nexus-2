@@ -78,6 +78,3 @@ class CryptoHoldings(Base):
 
     quantity = Column(Float)
     bought_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
-    current_price = Column(Float)
-
-    crypto_price = relationship("Crypto_Prices", foreign_keys=[token_id], primaryjoin="CryptoHoldings.token_id == Crypto_Prices.token_id", order_by="desc(Crypto_Prices.price_time)", uselist=False)
