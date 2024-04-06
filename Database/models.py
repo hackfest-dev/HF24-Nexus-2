@@ -73,4 +73,12 @@ class VolatilityIndex(Base):
     normalized_volatility_index = Column(Float, nullable=False)
     date = Column(TIMESTAMP, nullable=False, primary_key=True , server_default=func.now())
 
+class Feeling(Base):
+    __tablename__ = 'feelings'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(100), ForeignKey("users.uid"))
+    feeling = Column(String)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
 

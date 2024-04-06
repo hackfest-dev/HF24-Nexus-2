@@ -414,3 +414,14 @@ def calculate_stress_metric(uid: str, db: Session = Depends(get_db)):
 
     return {'stress_metric': stress_metric}
 
+@app.post("/users/{uid}/submitfeeling")
+def submit_feeling(uid: str, feeling: str, db: Session = Depends(get_db)):
+    try:
+        # Create a new Feeling object and save it to the database
+        new_feeling = models.Feeling(uid=uid, feeling=feeling)
+        db.add(new_feeling)
+        db.commit()
+        return {"status": "Success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to submit feeling: " + str(e))
+
